@@ -78,6 +78,18 @@ jobs:
             --branch=main \
             --commit-dirty=true
 
+      - name: 刷新 jsDelivr 缓存
+        if: steps.commit.outputs.changed == 'true'
+        run: |
+          set -euo pipefail
+          # jsDelivr 对分支型 URL（@main）最长缓存 12 小时，不主动 purge
+          # 的话每天构建的新规则要隔很久才生效。purge 每小时限 3~4 次，
+          # 每天一次远在限额内。失败不阻塞构建。
+          pac=$(cd public && find . -name '*.pac' | head -1 | sed 's|^\./||')
+          url="https://purge.jsdelivr.net/gh/${GITHUB_REPOSITORY}@${GITHUB_REF_NAME}/public/${pac}"
+          echo "purge public/${pac}"
+          curl -fsS --max-time 30 "$url" || echo "::warning::jsDelivr purge 失败，缓存最多 12h 后自动过期"
+
       - name: 冒烟测试
         if: steps.commit.outputs.changed == 'true' && vars.PAC_SMOKE_URL != ''
         run: |
