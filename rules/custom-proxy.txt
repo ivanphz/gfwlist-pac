@@ -1,0 +1,45 @@
+# ============================================================
+# 强制走代理 —— 优先级高于 gfwlist 的 @@ 白名单
+# ============================================================
+#
+# 语法和 custom-direct.txt 完全一样：
+#   example.com          该域名 + 所有子域
+#   full:example.com     只匹配这一个主机名
+#   *.cdn.example.com    等价于 cdn.example.com
+#   img*.example.com     主机名通配
+#   203.0.113.7          单个 IP
+#   203.0.113.0/24       IP 网段
+#   keyword:/download/   整条 URL 含该子串（慎用）
+#   行尾可以用   # 注释
+#
+# 提醒：命中这里的流量，如果所有代理都连不上，会按 config 里的
+#       fallback 处理。默认 "block"（返回一个连不通的地址，直接失败），
+#       不会偷偷降级成直连泄露出去。
+
+
+# ---------- 自建服务 / VPS ----------
+# my-vps.example.com
+# *.my-tunnel.example.net
+
+
+# ---------- gfwlist 没收录但你要代理的 ----------
+# 参考写法：
+# openai.com
+# anthropic.com
+# claude.ai
+# cursor.sh
+# huggingface.co
+# civitai.com
+
+
+# ---------- 开发相关 ----------
+# 这些一般 gfwlist 已经有了，重复写不会出错，只是没必要
+# ghcr.io
+# gcr.io
+# k8s.gcr.io
+# registry.k8s.io
+
+
+# ---------- 按 URL 路径代理 ----------
+# 只有极少数场景需要，写多了每个请求都要线性扫一遍
+# keyword:/api/v1/stream

@@ -1,0 +1,27 @@
+{
+  "upstream": "https://raw.githubusercontent.com/gfwlist/gfwlist/master/gfwlist.txt",
+  "proxy": [
+    "SOCKS5 127.0.0.1:1080",
+    "PROXY 127.0.0.1:7890"
+  ],
+  "fallback": "block",
+  "blockProxy": "PROXY 127.0.0.1:1",
+  "defaultAction": "direct",
+  "outDir": "public",
+  "fileName": "proxy.pac",
+  "pathToken": "",
+  "extraSources": {
+    "loyalsoldier-direct": {
+      "enabled": true,
+      "side": "direct",
+      "mode": "report",
+      "url": "https://raw.githubusercontent.com/Loyalsoldier/v2ray-rules-dat/release/direct-list.txt"
+    },
+    "loyalsoldier-proxy": {
+      "enabled": false,
+      "side": "proxy",
+      "mode": "full",
+      "url": "https://raw.githubusercontent.com/Loyalsoldier/v2ray-rules-dat/release/proxy-list.txt"
+    }
+  }
+}

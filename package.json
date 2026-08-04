@@ -1,0 +1,13 @@
+{
+  "name": "gfwlist-pac",
+  "version": "1.0.0",
+  "private": true,
+  "description": "把 gfwlist 合并自有规则后编译成 Windows 可直接用的 PAC",
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "test": "node scripts/test.mjs",
+    "all": "node scripts/build.mjs && node scripts/test.mjs"
+  },
+  "engines": { "node": ">=20" }
+}

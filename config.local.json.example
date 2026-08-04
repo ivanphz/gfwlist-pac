@@ -1,0 +1,15 @@
+{
+  "_comment": "复制成 config.local.json 后按需修改；这里的值会覆盖 config.json（extraSources 按 key 深合并）",
+
+  "proxy": [
+    "SOCKS5 127.0.0.1:7891",
+    "PROXY 127.0.0.1:7890"
+  ],
+  "fallback": "block",
+
+  "pathToken": "换成一串你自己的随机字符串",
+
+  "extraSources": {
+    "loyalsoldier-direct": { "mode": "intersect" }
+  }
+}
