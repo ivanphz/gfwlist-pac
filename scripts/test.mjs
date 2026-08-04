@@ -138,6 +138,20 @@ const CASES = [
   ['printer.lan', 'D'],
   ['nas.home.arpa', 'D'],
 
+  // IPv6：本机 / 链路本地 / 唯一本地 -> 直连
+  ['[::1]', 'D'],
+  ['[fe80::1]', 'D'],
+  ['[fd00:1234::5678]', 'D'],
+  // IPv4 映射地址应拆回 IPv4 走同一套规则
+  ['[::ffff:192.168.1.1]', 'D'],
+  ['[::ffff:114.114.114.114]', 'D'],
+  // 公网 IPv6 字面量：按 defaultAction（direct），不是硬编码
+  ['[2606:4700::1111]', 'D'],
+  // 自有 IPv6 规则（压缩写法 / 大小写 都要能命中）
+  ['[2400:3200::1]', 'D'],
+  ['[2400:3200:0000:0000:0000:0000:0000:0001]', 'D'],
+  ['[240C::6666]', 'D'],
+
   // 公共 DNS 的 IP（只有 DoH 才走 PAC）
   ['114.114.114.114', 'D'],
   ['223.5.5.5', 'D'],
@@ -189,6 +203,7 @@ async function main() {
     Object,
     RegExp,
     String,
+    parseInt,
   });
   vm.runInContext(src, ctx, { filename: 'proxy.pac' });
   if (typeof ctx.FindProxyForURL !== 'function') {
@@ -232,6 +247,8 @@ async function main() {
   }
   for (const d of cProxy.buckets.exact) cases.push([d, 'P']);
   for (const d of cDirect.buckets.exact) cases.push([d, 'D']);
+  for (const a of cProxy.buckets.v6) cases.push(['[' + a + ']', 'P']);
+  for (const a of cDirect.buckets.v6) cases.push(['[' + a + ']', 'D']);
   console.log(
     `[ok]   自有规则 ${cProxy.buckets.domain.size} 代理 / ${cDirect.buckets.domain.size} 直连，已纳入用例`
   );

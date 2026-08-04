@@ -70,23 +70,30 @@ const CHAIN_SCHEMES = /^(DIRECT|PROXY|HTTP|HTTPS|SOCKS|SOCKS4|SOCKS5)$/i;
 // Chrome / Firefox 有自己的 PAC 引擎，额外支持 SOCKS / SOCKS4 / SOCKS5。
 const WININET_SCHEMES = /^(DIRECT|PROXY)$/i;
 
-/** 检查代理链，返回告警数组。只警告不中断 —— 有些写法是刻意为之。 */
-export function validateChain(list) {
+/**
+ * 检查代理链。返回 { errors, warns }。
+ * errors 会直接中断构建 —— 这些写法会让 PAC 被客户端整个丢弃，
+ * 表现成「像是没配 PAC 一样」，比构建失败难查得多。
+ */
+export function validateChain(list, opts = {}) {
+  const errors = [];
   const warns = [];
   const endpoints = new Set();
+  const socksHops = [];
   let sawWinInetHop = false;
 
   for (const hop of list) {
     const m = hop.trim().match(/^(\S+)(?:\s+(\S+))?$/);
     if (!m) {
-      warns.push(`代理链条目格式看不懂: "${hop}"`);
+      errors.push(`代理链条目格式看不懂: "${hop}"`);
       continue;
     }
     const [, scheme, addr] = m;
     if (!CHAIN_SCHEMES.test(scheme)) {
-      warns.push(`"${hop}" 的类型 ${scheme} 不是合法的 PAC 关键字`);
+      errors.push(`"${hop}" 的类型 ${scheme} 不是合法的 PAC 关键字`);
       continue;
     }
+    if (/^SOCKS/i.test(scheme)) socksHops.push(hop);
     if (/^DIRECT$/i.test(scheme)) {
       sawWinInetHop = true;
       continue;
@@ -98,29 +105,37 @@ export function validateChain(list) {
 
     const pm = addr.match(/^(.+):(\d+)$/);
     if (!pm) {
-      warns.push(`"${hop}" 的地址不是 host:port 形式`);
+      errors.push(`"${hop}" 的地址不是 host:port 形式`);
       continue;
     }
     const port = Number(pm[2]);
     if (port === 0) {
       warns.push(
-        `"${hop}" 用了端口 0。0 不是合法 TCP 端口，不同引擎的处理不一致：` +
-          `有的整条跳过、有的会归一成默认端口。建议改成 127.0.0.1:1，` +
-          `环回口上会立刻收到 RST，失败更快也更确定。`
+        `"${hop}" 用了端口 0。0 不是合法 TCP 端口，不同客户端处理不一致：` +
+          `有的整条跳过、有的会归一成默认端口（万一本机 80/1080 上真跑着东西，` +
+          `被 block 的流量就送错地方了）。建议改成 127.0.0.1:1 —— ` +
+          `合法端口、实际无人占用，环回口上立刻收到 RST，失败更快也更确定。`
       );
     } else if (port > 65535) {
-      warns.push(`"${hop}" 的端口 ${port} 超出范围`);
+      errors.push(`"${hop}" 的端口 ${port} 超出范围`);
     }
 
     endpoints.add(addr);
     if (WININET_SCHEMES.test(scheme)) sawWinInetHop = true;
   }
 
-  if (!sawWinInetHop) {
-    warns.push(
-      '整条链里没有 PROXY 或 DIRECT。Windows 的系统代理（WinINET/WinHTTP）不认 SOCKS 系列关键字，' +
-        '只有 Chrome / Firefox 自带的 PAC 引擎认。这样配的话，走系统代理的程序会全部连不上。'
+  if (socksHops.length && !opts.allowSocks) {
+    errors.push(
+      `代理链里有 SOCKS 条目（${socksHops.join(', ')}）。\n` +
+        '        Windows 的系统代理（WinINET / WinHTTP）不支持 SOCKS，而且实测表明\n' +
+        '        很多客户端遇到不认识的关键字不是跳过该条、而是把整个返回值判为无效，\n' +
+        '        表现成「像是根本没配 PAC」——Google Drive 桌面端就是这样。\n' +
+        '        请全部改成 PROXY。确实只给 Chrome/Firefox 用、且清楚后果的话，\n' +
+        '        在 config 里设 "allowSocks": true 显式放行。'
     );
+  }
+  if (!sawWinInetHop && !errors.length) {
+    errors.push('整条链里没有 PROXY 或 DIRECT，走系统代理的程序会全部连不上。');
   }
 
   // 末端的 block 地址不算冗余，排掉再判断
@@ -132,7 +147,7 @@ export function validateChain(list) {
         `但要注意进程一挂两跳一起失效，这不构成真正的冗余。`
     );
   }
-  return warns;
+  return { errors, warns };
 }
 
 /**
@@ -192,6 +207,55 @@ function normalizeHost(s) {
 function globToDomain(g) {
   const m = g.match(/^\*+\.(.+)$/);
   return m ? normalizeHost(m[1]) : null;
+}
+
+/**
+ * IPv6 归一化：展开成 8 组 4 位小写十六进制。
+ * 2001:db8::1 -> 2001:0db8:0000:0000:0000:0000:0000:0001
+ * 内嵌 IPv4 的写法（::ffff:1.2.3.4、2001:db8::1.2.3.4）也一并处理。
+ */
+export function expandV6(input) {
+  let s = String(input).trim().toLowerCase();
+  s = s.replace(/^\[/, '').replace(/\]$/, '');
+  s = s.replace(/%[0-9a-z]+$/, ''); // 去掉 zone id，如 fe80::1%eth0
+  if (!s.includes(':')) return null;
+
+  // 尾部内嵌的 IPv4 转成两组十六进制
+  const v4 = s.match(/(\d{1,3}(?:\.\d{1,3}){3})$/);
+  if (v4) {
+    const o = v4[1].split('.').map(Number);
+    if (o.some((n) => !Number.isInteger(n) || n < 0 || n > 255)) return null;
+    const hi = ((o[0] << 8) | o[1]).toString(16);
+    const lo = ((o[2] << 8) | o[3]).toString(16);
+    s = s.slice(0, -v4[1].length) + hi + ':' + lo;
+  }
+
+  let groups;
+  if (s.includes('::')) {
+    const parts = s.split('::');
+    if (parts.length !== 2) return null;
+    const head = parts[0] ? parts[0].split(':') : [];
+    const tail = parts[1] ? parts[1].split(':') : [];
+    const fill = 8 - head.length - tail.length;
+    if (fill < 0) return null;
+    groups = head.concat(new Array(fill).fill('0'), tail);
+  } else {
+    groups = s.split(':');
+  }
+  if (groups.length !== 8) return null;
+  if (!groups.every((g) => /^[0-9a-f]{1,4}$/.test(g))) return null;
+  return groups.map((g) => g.padStart(4, '0')).join(':');
+}
+
+/** IPv6 CIDR -> 十六进制前缀（去掉冒号）。前缀长度必须是 4 的倍数。 */
+export function v6Prefix(input) {
+  const m = String(input).trim().match(/^\[?([0-9a-f:.]+)\]?\/(\d{1,3})$/i);
+  if (!m) return null;
+  const bits = Number(m[2]);
+  if (bits < 0 || bits > 128 || bits % 4 !== 0) return null;
+  const full = expandV6(m[1]);
+  if (!full) return null;
+  return full.split(':').join('').slice(0, bits / 4);
 }
 
 /** CIDR -> ["网络地址", "掩码"]，给 PAC 的 isInNet 用 */
@@ -296,6 +360,8 @@ function emptyBuckets() {
     exact: new Set(),
     glob: new Set(),
     cidr: new Set(),
+    v6: new Set(), // IPv6 精确地址（已展开成 8 组）
+    v6net: new Set(), // IPv6 前缀（十六进制，无冒号）
     keyword: new Set(),
   };
 }
@@ -493,6 +559,19 @@ export async function loadCustom(file) {
       else bad.push(raw.trim());
       continue;
     }
+    // IPv6：2001:db8::1 或 2001:db8::/32，方括号可有可无
+    if (/^\[?[0-9a-f]*:[0-9a-f:.]*\]?(\/\d{1,3})?$/i.test(line) && line.includes(':')) {
+      if (line.includes('/')) {
+        const pfx = v6Prefix(line);
+        if (pfx !== null) b.v6net.add(pfx);
+        else bad.push(raw.trim() + '  (IPv6 前缀长度必须是 4 的倍数)');
+      } else {
+        const full = expandV6(line);
+        if (full) b.v6.add(full);
+        else bad.push(raw.trim());
+      }
+      continue;
+    }
 
     const r = hostRule(line, 'custom', /* allowTld */ true);
     if (r.kind === 'domain') b.domain.add(r.value);
@@ -582,6 +661,14 @@ var DIRECT_D = ${jsObject(d.direct.domain)};
 var PROXY_N = ${jsNets(d.proxy.cidr)};
 var DIRECT_N = ${jsNets(d.direct.cidr)};
 
+// IPv6 精确地址（已展开成 8 组 4 位）
+var PROXY_V6 = ${jsObject(d.proxy.v6)};
+var DIRECT_V6 = ${jsObject(d.direct.v6)};
+
+// IPv6 前缀（十六进制，无冒号）
+var PROXY_V6N = ${jsArray(d.proxy.v6net)};
+var DIRECT_V6N = ${jsArray(d.direct.v6net)};
+
 // 通配主机名
 var PROXY_G = ${jsArray(d.proxy.glob)};
 var DIRECT_G = ${jsArray(d.direct.glob)};
@@ -606,6 +693,79 @@ function inAnyNet(h, list) {
     return false;
 }
 
+// 把 IPv6 展开成 8 组 4 位十六进制，方便做精确/前缀匹配
+function expandV6(a) {
+    var i, g, parts, head, tail, groups, m4, o, s;
+    a = ("" + a).toLowerCase();
+    if (a.charAt(0) === "[") a = a.substring(1);
+    if (a.charAt(a.length - 1) === "]") a = a.substring(0, a.length - 1);
+    i = a.indexOf("%");
+    if (i >= 0) a = a.substring(0, i);          // 去掉 zone id
+    if (a.indexOf(":") < 0) return null;
+
+    // 尾部内嵌的 IPv4 转成两组十六进制
+    m4 = a.match(/(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/);
+    if (m4) {
+        o = m4[1].split(".");
+        a = a.substring(0, a.length - m4[1].length)
+            + ((parseInt(o[0], 10) << 8) | parseInt(o[1], 10)).toString(16) + ":"
+            + ((parseInt(o[2], 10) << 8) | parseInt(o[3], 10)).toString(16);
+    }
+
+    if (a.indexOf("::") >= 0) {
+        parts = a.split("::");
+        if (parts.length !== 2) return null;
+        head = parts[0] ? parts[0].split(":") : [];
+        tail = parts[1] ? parts[1].split(":") : [];
+        groups = [];
+        for (i = 0; i < head.length; i++) groups.push(head[i]);
+        for (i = head.length + tail.length; i < 8; i++) groups.push("0");
+        for (i = 0; i < tail.length; i++) groups.push(tail[i]);
+    } else {
+        groups = a.split(":");
+    }
+    if (groups.length !== 8) return null;
+
+    s = "";
+    for (i = 0; i < 8; i++) {
+        g = groups[i];
+        if (!/^[0-9a-f]{1,4}$/.test(g)) return null;
+        while (g.length < 4) g = "0" + g;
+        s += (i ? ":" : "") + g;
+    }
+    return s;
+}
+
+function hasPrefix(hex, list) {
+    var i;
+    for (i = 0; i < list.length; i++) {
+        if (hex.substring(0, list[i].length) === list[i]) return true;
+    }
+    return false;
+}
+
+function routeV6(a) {
+    var full = expandV6(a);
+    if (full === null) return DEF;              // 不认识的写法，交给默认动作
+    var hex = full.split(":").join("");
+    var p3 = hex.substring(0, 3);
+    var p2 = hex.substring(0, 2);
+
+    // ::1 本机 / :: 未指定
+    if (hex === "00000000000000000000000000000001") return D;
+    if (hex === "00000000000000000000000000000000") return D;
+    // fe80::/10 链路本地
+    if (p3 === "fe8" || p3 === "fe9" || p3 === "fea" || p3 === "feb") return D;
+    // fc00::/7 唯一本地地址（相当于 IPv6 的内网段）
+    if (p2 === "fc" || p2 === "fd") return D;
+
+    if (has(DIRECT_V6, full)) return D;
+    if (has(PROXY_V6, full)) return P;
+    if (hasPrefix(hex, DIRECT_V6N)) return D;
+    if (hasPrefix(hex, PROXY_V6N)) return P;
+    return DEF;                                 // 其余按默认动作，不再一刀切直连
+}
+
 function isPrivateIP(h) {
     return isInNet(h, "10.0.0.0", "255.0.0.0")
         || isInNet(h, "172.16.0.0", "255.240.0.0")
@@ -618,12 +778,24 @@ function isPrivateIP(h) {
 function FindProxyForURL(url, host) {
     host = ("" + host).toLowerCase();
 
-    // IPv6 字面量（[::1] 或裸 ::1）一律直连
-    if (host.charAt(0) === "[") return D;
-    var c1 = host.indexOf(":");
-    if (c1 >= 0 && host.indexOf(":", c1 + 1) >= 0) return D;
+    // ---- IPv6 字面量 ----
+    var v6 = null, rb, m4;
+    if (host.charAt(0) === "[") {
+        rb = host.indexOf("]");
+        v6 = rb > 0 ? host.substring(1, rb) : host.substring(1);
+    } else if (host.indexOf(":") >= 0
+               && host.indexOf(":", host.indexOf(":") + 1) >= 0) {
+        v6 = host;                              // 裸 IPv6，不可能带端口
+    }
+    if (v6 !== null) {
+        // IPv4 映射地址 ::ffff:1.2.3.4 拆回 IPv4，走下面那套规则
+        m4 = v6.toLowerCase().match(/^::ffff:(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/);
+        if (m4) host = m4[1];
+        else return routeV6(v6);
+    }
 
     // 去掉端口和结尾的点
+    var c1 = host.indexOf(":");
     if (c1 >= 0) host = host.substring(0, c1);
     while (host.length && host.charAt(host.length - 1) === ".") {
         host = host.substring(0, host.length - 1);
@@ -715,8 +887,15 @@ async function main() {
   const offline = argv.includes('--offline');
   const cfg = await loadConfig();
   const chain = buildProxyChain(cfg);
-  const chainWarns = validateChain(chain.split(';').map((s) => s.trim()));
-  for (const w of chainWarns) console.warn(`[warn] 代理链: ${w}`);
+  const chk = validateChain(
+    chain.split(';').map((s) => s.trim()),
+    { allowSocks: cfg.allowSocks === true }
+  );
+  for (const w of chk.warns) console.warn(`[warn] 代理链: ${w}`);
+  if (chk.errors.length) {
+    throw new Error('代理链有致命问题：\n  - ' + chk.errors.join('\n  - '));
+  }
+  const chainWarns = chk.warns;
   const defaultAction =
     (cfg.defaultAction || 'direct').toLowerCase() === 'proxy' ? 'P' : 'D';
 
