@@ -1,0 +1,93 @@
+name: build-pac
+
+on:
+  # 每天 UTC 20:00 = 北京时间次日 04:00，上游一般已刷新
+  schedule:
+    - cron: '0 20 * * *'
+  # 改了自有规则或配置就立刻重建
+  push:
+    branches: [main]
+    paths:
+      - 'rules/**'
+      - 'static/**'
+      - 'scripts/**'
+      - 'config.json'
+      - 'config.local.json'
+      - '.github/workflows/build.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-pac
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    # secrets 不能直接写在 if: 里，必须先降到 env 再判断
+    env:
+      PAC_PROXY: ${{ secrets.PAC_PROXY }}
+      PAC_PATH_TOKEN: ${{ secrets.PAC_PATH_TOKEN }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # 必须落在具名分支上，否则后面 wrangler 会当成 Preview 部署
+          ref: ${{ github.ref_name }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: 构建 PAC
+        run: node scripts/build.mjs
+
+      - name: 自测
+        run: node scripts/test.mjs
+
+      - name: 有变化才提交
+        id: commit
+        run: |
+          set -euo pipefail
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A public
+          # stats.json 里的 builtAt 每次都变，只看 .pac 有没有实质变化
+          if git diff --cached --quiet -- '*.pac'; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "规则无变化，跳过提交"
+            git reset
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            git commit -m "chore: 同步 gfwlist $(date -u +%Y-%m-%d)"
+            git push
+          fi
+
+      # ↓ 可选。如果 Cloudflare Pages 用的是 Git 集成（直接连这个仓库），
+      #   上一步 push 就已经触发部署了，把这一步整段删掉即可。
+      - name: 部署到 Cloudflare Pages
+        if: steps.commit.outputs.changed == 'true' && env.CLOUDFLARE_API_TOKEN != ''
+        run: |
+          npx --yes wrangler@3 pages deploy public \
+            --project-name="${{ vars.CF_PAGES_PROJECT }}" \
+            --branch=main \
+            --commit-dirty=true
+
+      - name: 冒烟测试
+        if: steps.commit.outputs.changed == 'true' && vars.PAC_SMOKE_URL != ''
+        run: |
+          set -euo pipefail
+          # 带随机串绕开边缘缓存，避免测到部署前的旧响应
+          url="${{ vars.PAC_SMOKE_URL }}?cb=${GITHUB_RUN_ID}${RANDOM}"
+          echo "GET ${url%%\?*}?cb=***"
+          body=$(curl -fsSL --max-time 20 -H 'Cache-Control: no-cache' "$url")
+          echo "$body" | grep -q 'function FindProxyForURL' \
+            || { echo "::error::返回内容里没有 FindProxyForURL"; exit 1; }
+          echo "$body" | grep -q '"google.com"' \
+            || { echo "::error::规则集看起来是空的"; exit 1; }
+          echo "冒烟测试通过"
