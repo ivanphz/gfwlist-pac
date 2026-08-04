@@ -67,30 +67,45 @@ PAC 标准里没有 `BLOCK` 关键字，所以「阻断」是靠返回一个必�
 SOCKS5 127.0.0.1:1080|PROXY 127.0.0.1:7890
 ```
 
-### ⚠️ Windows 系统代理不认 SOCKS
+### 🚫 不要在链里写 SOCKS —— 会让整个 PAC 失效
 
-微软的 netsh 文档写明 **WinHTTP 不支持 SOCKS5**，Windows 的系统代理设置也没有
-原生 SOCKS 支持。也就是说「使用设置脚本」这条路（WinINET / WinHTTP）**只认
-`PROXY` 和 `DIRECT`**；`SOCKS` / `SOCKS4` / `SOCKS5` 只有 Chrome、Firefox
-自带的 PAC 引擎认。
+微软的 netsh 文档写明 **WinHTTP 不支持 SOCKS5**，Windows 的系统代理也没有原生
+SOCKS 支持。但实际后果比"不支持"严重得多：
 
-所以代理链里**必须至少有一跳是 `PROXY`**，否则走系统代理的程序会全部连不上，
-而浏览器却一切正常 —— 这种"一半能用"的故障最难查。
+**很多客户端遇到不认识的关键字，不是跳过该条、而是把整个返回值判为无效，
+表现成「像是根本没配 PAC」。** Google Drive 桌面端实测就是这样 —— 
+写了 `SOCKS5 ...; PROXY ...; PROXY ...` 之后它完全不认，直连出去。
+浏览器却一切正常，这种"一半能用"的故障最难查。
 
-`npm run build` 现在会检查这一点，还会一并检查：
+所以：**代理链里只写 `PROXY` 和 `DIRECT`**。
+
+```json
+"proxy": ["PROXY 127.0.0.1:1085"],
+"fallback": "block"
+```
+
+`npm run build` 现在遇到 SOCKS 条目会**直接构建失败**，不再只是告警。
+确实只给 Chrome / Firefox 用、且清楚后果的，在 config 里设 `"allowSocks": true`
+显式放行。
+
+构建期还会一并检查：
 
 - 端口是不是 0 或超出范围
 - 有没有拼错的关键字（`SOCK5` 之类）
 - 多跳是不是都指向同一个 `host:port`（那不构成真正的冗余）
 
-告警只提示、不中断构建，也会写进 `stats.json` 的 `proxyChainWarnings`。
+前三项是**错误**，直接中断构建；最后一项是告警，会写进 `stats.json` 的
+`proxyChainWarnings`。
 
-### 关于 blockProxy 的端口
+### blockProxy 用端口 1，不要用 0
 
-默认 `PROXY 127.0.0.1:1`。**不建议用端口 0** —— 0 不是合法 TCP 端口，
-不同引擎处理不一致：有的把整条跳过，有的会归一成默认端口（万一你本机
-80/1080 上真跑着东西，流量就送错地方了）。端口 1 是合法端口、实际无人占用，
-环回口上会立刻收到 RST，失败更快也更确定。
+**结论：`PROXY 127.0.0.1:1`。**
+
+0 不是合法 TCP 端口，不同客户端处理不一致 —— 有的把整条跳过，有的会归一成
+默认端口（万一本机 80 或 1080 上真跑着东西，被 block 的流量就送错地方了）。
+端口 1 是合法端口、实际无人占用，环回口上立刻收到 RST，失败更快也更确定。
+
+用 0 不会中断构建，只会告警。
 
 ### 3. 设访问口令（可选但推荐）
 
@@ -122,12 +137,30 @@ Windows 拉 PAC 不会带任何认证头，所以**路径即口令**是这里唯
 
 ## 二、jsDelivr CDN 地址
 
-仓库公开后，不用自己部署也能直接用（四个是同一份文件的不同边缘节点，任选其一）：
+仓库公开后，不用自己部署也能直接用。四个是同一份文件的不同边缘节点，**任选其一**，
+哪个快用哪个。每个代码块右上角有独立的复制按钮，点一下就是完整地址。
+
+**官方主入口**
 
 ```
 https://cdn.jsdelivr.net/gh/ivanphz/gfwlist-pac@main/public/proxy.pac
+```
+
+**Cloudflare 节点**
+
+```
 https://testingcf.jsdelivr.net/gh/ivanphz/gfwlist-pac@main/public/proxy.pac
+```
+
+**Gcore 节点**
+
+```
 https://gcore.jsdelivr.net/gh/ivanphz/gfwlist-pac@main/public/proxy.pac
+```
+
+**Fastly 节点**
+
+```
 https://fastly.jsdelivr.net/gh/ivanphz/gfwlist-pac@main/public/proxy.pac
 ```
 
@@ -185,7 +218,7 @@ https://pac.你的域名/proxy.pac        <- Cloudflare Pages 自定义域名
 
 | # | 检查 | 结果 |
 |---|---|---|
-| 1 | IPv6 字面量 | 直连 |
+| 1 | IPv6 字面量 | 见下方单独一节 |
 | 2 | 单标签主机名（`localhost` / `nas` / `router`） | 直连 |
 | 3 | 精确匹配 `full:` | DIRECT 优先 |
 | 4 | IP 字面量：内网段 → 精确 IP → CIDR | DIRECT 优先 |
@@ -194,6 +227,26 @@ https://pac.你的域名/proxy.pac        <- Cloudflare Pages 自定义域名
 | 7 | 代理通配 `PROXY_G` | 代理 |
 | 8 | 整条 URL 关键词 | DIRECT 优先 |
 | 9 | 都没命中 | **直连** |
+
+### IPv6 怎么走
+
+早期版本是「IPv6 一律直连」，太粗暴，已经改成分层处理：
+
+| IPv6 地址 | 结果 |
+|---|---|
+| `::1`、`::` | 直连 |
+| `fe80::/10` 链路本地 | 直连 |
+| `fc00::/7` 唯一本地地址（相当于 IPv6 的内网段） | 直连 |
+| `::ffff:1.2.3.4` IPv4 映射 | **拆回 IPv4**，走 IPv4 那一整套规则 |
+| 命中 `rules/` 里的 IPv6 规则 | 按规则 |
+| 其余 | 按 `defaultAction`（默认直连） |
+
+地址会先归一化成 8 组 4 位十六进制再比对，所以 `2400:3200::1`、
+`2400:3200:0000:...:0001`、`240C::6666` 这些压缩写法和大小写都能正确命中。
+
+需要说明的是：**这一节只管 URL 里直接写 IP 的情况**，比如
+`https://[2606:4700::1111]/`。域名解析到 IPv6 不受影响 —— PAC 拿到的是主机名，
+照常走域名规则。所以实际会命中这里的流量本来就很少。
 
 第 5 步排在后缀上溯**之前**，是刻意的：ABP 里 `@@` 例外规则本来就压过一切拦截规则。
 上游有一条「`xn--ngstr-lra8j.com` 整域走代理，但主机名里含 `2x3`/`ni5`/`j5o` 的走直连」
