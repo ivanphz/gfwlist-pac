@@ -1,0 +1,6 @@
+node_modules/
+.cache/
+*.log
+
+# 如果你把私密配置放在 Secrets 里，就把下面这行取消注释
+# config.local.json
