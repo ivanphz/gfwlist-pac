@@ -1,8 +1,8 @@
 {
   "upstream": "https://raw.githubusercontent.com/gfwlist/gfwlist/master/gfwlist.txt",
   "proxy": [
-    "SOCKS5 127.0.0.1:1080",
-    "PROXY 127.0.0.1:7890"
+    "SOCKS5 127.0.0.1:1085",
+    "PROXY 127.0.0.1:1085"
   ],
   "fallback": "block",
   "blockProxy": "PROXY 127.0.0.1:1",
