@@ -39,6 +39,14 @@
 # k8s.gcr.io
 # registry.k8s.io
 
+# ! Google 及 Drive 核心族域名
+google.com
+googleapis.com
+gstatic.com
+googleusercontent.com
+ggpht.com
+googledrive.com
+
 
 # ---------- 按 URL 路径代理 ----------
 # 只有极少数场景需要，写多了每个请求都要线性扫一遍
