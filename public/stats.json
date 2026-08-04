@@ -1,11 +1,8 @@
 {
-  "builtAt": "2026-08-04T07:37:02.664Z",
+  "builtAt": "2026-08-04T09:29:04.642Z",
   "upstream": "https://raw.githubusercontent.com/gfwlist/gfwlist/master/gfwlist.txt",
-  "proxyChain": "SOCKS5 127.0.0.1:1085; PROXY 127.0.0.1:1085; PROXY 127.0.0.1:0",
-  "proxyChainWarnings": [
-    "\"PROXY 127.0.0.1:0\" 用了端口 0。0 不是合法 TCP 端口，不同引擎的处理不一致：有的整条跳过、有的会归一成默认端口。建议改成 127.0.0.1:1，环回口上会立刻收到 RST，失败更快也更确定。",
-    "链上多跳都指向同一个 127.0.0.1:1085。如果它是混合端口（同时提供 SOCKS 和 HTTP），这样写是对的 —— 分别照顾浏览器和系统代理两条路径；但要注意进程一挂两跳一起失效，这不构成真正的冗余。"
-  ],
+  "proxyChain": "PROXY 127.0.0.1:1085; PROXY 127.0.0.1:1",
+  "proxyChainWarnings": [],
   "fallback": "block",
   "defaultAction": "direct",
   "counts": {
@@ -166,5 +163,5 @@
     "gle  (bad-domain)",
     "google  (bad-domain)"
   ],
-  "bytes": 80450
+  "bytes": 83688
 }
