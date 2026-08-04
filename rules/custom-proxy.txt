@@ -40,12 +40,23 @@
 # registry.k8s.io
 
 # ! Google 及 Drive 核心族域名
-google.com
-googleapis.com
-gstatic.com
-googleusercontent.com
-ggpht.com
-googledrive.com
+g2.gstatic.com
+g1.gstatic.com
+g0.gstatic.com
+checkin.gstatic.com
+adservice.google.com
+dl.google.com
+tools.google.com
+clientservices.googleapis.com
+imasdk.googleapis.com
+fonts.googleapis.com
+update.googleapis.com
+safebrowsing.googleapis.com
+connectivitycheck.gstatic.com
+csi.gstatic.com
+fonts.gstatic.com
+ssl.gstatic.com
+www.gstatic.com
 
 
 # ---------- 按 URL 路径代理 ----------
