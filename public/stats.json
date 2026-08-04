@@ -1,5 +1,5 @@
 {
-  "builtAt": "2026-08-04T07:29:39.174Z",
+  "builtAt": "2026-08-04T07:37:02.664Z",
   "upstream": "https://raw.githubusercontent.com/gfwlist/gfwlist/master/gfwlist.txt",
   "proxyChain": "SOCKS5 127.0.0.1:1085; PROXY 127.0.0.1:1085; PROXY 127.0.0.1:0",
   "proxyChainWarnings": [
@@ -10,7 +10,7 @@
   "defaultAction": "direct",
   "counts": {
     "proxyDomains": 4262,
-    "directDomains": 83,
+    "directDomains": 66,
     "proxyExact": 0,
     "directExact": 0,
     "proxyCidr": 0,
@@ -21,13 +21,31 @@
     "directKeywords": 0
   },
   "custom": {
-    "proxyRules": 6,
+    "proxyRules": 17,
     "directRules": 64,
     "unparsed": []
   },
   "overrides": {
     "customDirectBeatsProxy": [],
-    "customProxyBeatsDirect": []
+    "customProxyBeatsDirect": [
+      "g2.gstatic.com",
+      "g1.gstatic.com",
+      "g0.gstatic.com",
+      "checkin.gstatic.com",
+      "adservice.google.com",
+      "dl.google.com",
+      "tools.google.com",
+      "clientservices.googleapis.com",
+      "imasdk.googleapis.com",
+      "fonts.googleapis.com",
+      "update.googleapis.com",
+      "safebrowsing.googleapis.com",
+      "connectivitycheck.gstatic.com",
+      "csi.gstatic.com",
+      "fonts.gstatic.com",
+      "ssl.gstatic.com",
+      "www.gstatic.com"
+    ]
   },
   "extraSources": {
     "loyalsoldier-direct": {
@@ -141,12 +159,12 @@
       "unparsed": 56
     }
   },
-  "redundantDropped": 48,
+  "redundantDropped": 65,
   "skippedUpstreamRules": 3,
   "skippedSamples": [
     "goog  (bad-domain)",
     "gle  (bad-domain)",
     "google  (bad-domain)"
   ],
-  "bytes": 80858
+  "bytes": 80450
 }
