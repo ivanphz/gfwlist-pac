@@ -1,4 +1,4 @@
-var P = "SOCKS5 127.0.0.1:1085; PROXY 127.0.0.1:1085; PROXY 127.0.0.1:1";
+var P = "PROXY 127.0.0.1:1085; PROXY 127.0.0.1:1";
 var D = "DIRECT";
 
 function FindProxyForURL(url, host) {
