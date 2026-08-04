@@ -1,5 +1,5 @@
 {
-  "builtAt": "2026-08-04T09:29:04.642Z",
+  "builtAt": "2026-08-04T09:29:47.416Z",
   "upstream": "https://raw.githubusercontent.com/gfwlist/gfwlist/master/gfwlist.txt",
   "proxyChain": "PROXY 127.0.0.1:1085; PROXY 127.0.0.1:1",
   "proxyChainWarnings": [],
@@ -163,5 +163,5 @@
     "gle  (bad-domain)",
     "google  (bad-domain)"
   ],
-  "bytes": 83688
+  "bytes": 83910
 }
