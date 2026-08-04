@@ -1,7 +1,7 @@
 {
-  "builtAt": "2026-08-04T05:45:24.718Z",
+  "builtAt": "2026-08-04T06:04:27.139Z",
   "upstream": "https://raw.githubusercontent.com/gfwlist/gfwlist/master/gfwlist.txt",
-  "proxyChain": "SOCKS5 127.0.0.1:1085; PROXY 127.0.0.1:1085; PROXY 127.0.0.1:1",
+  "proxyChain": "SOCKS5 127.0.0.1:1080; PROXY 127.0.0.1:7890; PROXY 127.0.0.1:1",
   "fallback": "block",
   "defaultAction": "direct",
   "counts": {
@@ -11,10 +11,10 @@
     "directExact": 0,
     "proxyCidr": 0,
     "directCidr": 2,
-    "proxyGlobs": 18,
-    "directGlobs": 0,
+    "proxyGlobs": 17,
+    "directGlobs": 3,
     "proxyKeywords": 0,
-    "directKeywords": 1
+    "directKeywords": 0
   },
   "custom": {
     "proxyRules": 0,
@@ -144,5 +144,5 @@
     "gle  (bad-domain)",
     "google  (bad-domain)"
   ],
-  "bytes": 80755
+  "bytes": 80858
 }

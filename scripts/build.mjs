@@ -140,24 +140,61 @@ function cidrToNetmask(s) {
 }
 
 /**
- * 把「形状简单」的正则规则降级成 shExpMatch 的 glob。
- * 带断言/分组/字符集的一律放弃，让它进 skipped 列表由人工决定，绝不猜。
- *   /^https?:\/\/[^\/]+blogspot\.(.*)/  ->  *blogspot.*
+ * 把正则规则降级成 shExpMatch 的 glob，返回数组（可能多条）。
+ * 只处理形状明确的；带反向断言 / 命名分组 / 字符集的一律返回 []，
+ * 交给上层进 skipped 列表由人工决定，绝不猜、绝不硬塞进关键词。
+ *
+ *   /^https?:\/\/[^\/]+blogspot\.(.*)/
+ *     -> ["*blogspot.*"]
+ *   ^https?:\/\/(?=.*?(2x3|ni5|j5o))[a-z0-9.-]+\.xn--ngstr-lra8j\.com$
+ *     -> ["*2x3*.xn--ngstr-lra8j.com", "*ni5*...", "*j5o*..."]
  */
-function regexToGlob(src) {
-  let s = src;
+function regexToGlobs(src) {
+  let s = String(src);
+
+  // 去掉 /.../ 定界符。上游偶尔会漏掉收尾那个斜杠，这里两种都认。
+  if (s.startsWith('/')) s = s.slice(1);
+  if (s.endsWith('/')) s = s.slice(0, -1);
+
+  // JScript 不支持的语法，一律放弃（硬塞进去会让整个 PAC 加载失败）
+  if (/\(\?<|\\p\{|\\k</i.test(s)) return [];
+
+  // 抽出「URL 里必须含有其中之一」的前视断言：(?=.*?(A|B|C))
+  let alts = null;
+  const look = s.match(/^\^?(?:https\?:\\?\/\\?\/)?\(\?=\.[*+]\??\(([^)]*)\)\)/);
+  if (look) {
+    const parts = look[1].split('|').map((x) => x.trim().toLowerCase());
+    if (parts.length && parts.every((x) => /^[a-z0-9_-]+$/.test(x))) alts = parts;
+    else return [];
+    s = s.slice(look[0].length);
+    s = '^https?:\\/\\/' + s; // 把协议头补回去，走下面的通用流程
+  }
+  // 还残留断言/反向引用就放弃
+  if (/\(\?[!<]/.test(s)) return [];
+
   s = s.replace(/^\^https\?:\\?\/\\?\//, '');
   s = s.replace(/^\^\(\.\+\\?\.\)\*/, '*.'); // ^(.+\.)*
   s = s.replace(/\[\^\\?\/\]\+/g, '*'); // [^/]+
+  s = s.replace(/\[a-z0-9.\\?-\]\+/g, '*'); // [a-z0-9.-]+
   s = s.replace(/\(\.\*\??\)|\.\*\??|\.\+\??/g, '*'); // (.*) .* .+
   s = s.replace(/\\([./-])/g, '$1'); // 反转义
   s = s.replace(/^\^/, '').replace(/\$$/, '');
-  s = s.split('/')[0];
+  s = s.split('/')[0]; // 只取主机部分
   s = s.replace(/\*{2,}/g, '*').toLowerCase();
-  if (!/^[a-z0-9.*_-]+$/.test(s)) return null; // 还有正则元字符 -> 放弃
-  if (!s.includes('.')) return null;
-  if (s.replace(/[*.]/g, '').length < 4) return null; // 太泛，不要
-  return s;
+
+  if (!/^[a-z0-9.*_-]+$/.test(s)) return []; // 还有正则元字符 -> 放弃
+  if (!s.includes('.')) return [];
+  if (s.replace(/[*.]/g, '').length < 4) return []; // 太泛，不要
+
+  if (!alts) return [s];
+  // 把「必须含有 A」和主机模式合成一条：*.foo.com -> *A*.foo.com
+  if (!s.startsWith('*')) return [];
+  return alts.map((a) => '*' + a + '*' + s.slice(1));
+}
+
+/** 关键词只能是纯字面子串；带正则元字符说明是条没解析干净的规则 */
+function looksLikeRegex(s) {
+  return /[\^$()[\]{}|\\+?]/.test(s);
 }
 
 /**
@@ -212,17 +249,17 @@ function parseAutoProxy(text) {
     const b = isException ? direct : proxy;
 
     let r;
-    if (body.length > 1 && body[0] === '/' && body[body.length - 1] === '/') {
-      // 正则规则：先试着降级成 glob，再试着抽域名
-      const g = regexToGlob(body.slice(1, -1));
-      if (g) r = { kind: 'glob', value: g };
-      else {
-        const m = body.match(/([a-z0-9-]+(?:\\?\.[a-z0-9-]+)+)(?:\$|\/|\\\/|$)/i);
-        const host = m ? normalizeHost(m[1].replace(/\\/g, '')) : null;
-        r = host
-          ? { kind: 'domain', value: host }
-          : { kind: 'skip', value: body, reason: 'regex' };
-      }
+    // 正则规则：标准写法是 /pattern/，但上游偶尔漏掉收尾斜杠，
+    // 所以只要以 / 开头且长得像正则就按正则处理，不能让它掉进关键词兜底。
+    const looksRegex =
+      body.length > 1 &&
+      body[0] === '/' &&
+      (body[body.length - 1] === '/' || /[\^$\\]/.test(body));
+
+    if (looksRegex) {
+      const globs = regexToGlobs(body);
+      if (globs.length) r = { kind: 'globs', value: globs };
+      else r = { kind: 'skip', value: body, reason: 'regex-untranslatable' };
     } else if (body.startsWith('||')) {
       r = hostRule(body.slice(2), 'bad-domain'); // 上游不允许单段 TLD 规则
     } else if (body.startsWith('|')) {
@@ -235,7 +272,10 @@ function parseAutoProxy(text) {
     } else {
       const host = normalizeHost(body);
       if (host) r = { kind: 'domain', value: host };
-      else {
+      else if (looksLikeRegex(body)) {
+        // 带正则元字符的东西当子串匹配永远匹配不上，直接报告
+        r = { kind: 'skip', value: body, reason: 'regex-like-not-keyword' };
+      } else {
         const kw = body.replace(/\*/g, '').trim().toLowerCase();
         r =
           kw.length >= 4
@@ -246,6 +286,7 @@ function parseAutoProxy(text) {
 
     if (r.kind === 'domain') b.domain.add(r.value);
     else if (r.kind === 'glob') addGlob(b, r.value);
+    else if (r.kind === 'globs') for (const g of r.value) b.glob.add(g);
     else if (r.kind === 'keyword') b.keyword.add(r.value);
     else skipped.push(`${isException ? '@@' : ''}${r.value}  (${r.reason})`);
   }
@@ -276,11 +317,11 @@ function parseDomainList(text) {
       if (h) b.exact.add(h);
       else skipped.push(line);
     } else if (pre === 'keyword') {
-      if (val.length >= 4) b.keyword.add(val.toLowerCase());
+      if (val.length >= 4 && !looksLikeRegex(val)) b.keyword.add(val.toLowerCase());
       else skipped.push(line);
     } else if (pre === 'regexp') {
-      const g = regexToGlob(val);
-      if (g) addGlob(b, g);
+      const globs = regexToGlobs(val);
+      if (globs.length) for (const g of globs) b.glob.add(g);
       else skipped.push(line);
     } else if (pre === 'domain' || i < 0) {
       const r = hostRule(val, 'list');
@@ -366,7 +407,7 @@ export async function loadCustom(file) {
     const low = line.toLowerCase();
     if (low.startsWith('keyword:')) {
       const kw = line.slice(8).trim().toLowerCase();
-      if (kw) b.keyword.add(kw);
+      if (kw && !looksLikeRegex(kw)) b.keyword.add(kw);
       else bad.push(raw.trim());
       continue;
     }
@@ -536,6 +577,12 @@ function FindProxyForURL(url, host) {
         return DEF;
     }
 
+    // 直连通配：白名单例外规则优先于一切后缀规则（ABP 里 @@ 就是这个语义）
+    var k;
+    for (k = 0; k < DIRECT_G.length; k++) {
+        if (shExpMatch(host, DIRECT_G[k])) return D;
+    }
+
     // 域名后缀逐级上溯：最长匹配优先，同级 DIRECT 压过 PROXY
     var h = host;
     for (;;) {
@@ -546,11 +593,7 @@ function FindProxyForURL(url, host) {
         h = h.substring(i + 1);
     }
 
-    // 通配主机名
-    var k;
-    for (k = 0; k < DIRECT_G.length; k++) {
-        if (shExpMatch(host, DIRECT_G[k])) return D;
-    }
+    // 代理通配
     for (k = 0; k < PROXY_G.length; k++) {
         if (shExpMatch(host, PROXY_G[k])) return P;
     }

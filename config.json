@@ -5,7 +5,7 @@
     "PROXY 127.0.0.1:1085"
   ],
   "fallback": "block",
-  "blockProxy": "PROXY 127.0.0.1:1",
+  "blockProxy": "PROXY 127.0.0.1:0",
   "defaultAction": "direct",
   "outDir": "public",
   "fileName": "proxy.pac",

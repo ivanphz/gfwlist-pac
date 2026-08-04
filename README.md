@@ -100,10 +100,15 @@ Windows 拉 PAC 不会带任何认证头，所以**路径即口令**是这里唯
 | 2 | 单标签主机名（`localhost` / `nas` / `router`） | 直连 |
 | 3 | 精确匹配 `full:` | DIRECT 优先 |
 | 4 | IP 字面量：内网段 → 精确 IP → CIDR | DIRECT 优先 |
-| 5 | **域名后缀逐级上溯，最长匹配优先，同级 DIRECT 压 PROXY** | |
-| 6 | 通配主机名 `shExpMatch` | DIRECT 优先 |
-| 7 | 整条 URL 关键词 | DIRECT 优先 |
-| 8 | 都没命中 | **直连** |
+| 5 | **直连通配** `DIRECT_G` | 直连 |
+| 6 | **域名后缀逐级上溯，最长匹配优先，同级 DIRECT 压 PROXY** | |
+| 7 | 代理通配 `PROXY_G` | 代理 |
+| 8 | 整条 URL 关键词 | DIRECT 优先 |
+| 9 | 都没命中 | **直连** |
+
+第 5 步排在后缀上溯**之前**，是刻意的：ABP 里 `@@` 例外规则本来就压过一切拦截规则。
+上游有一条「`xn--ngstr-lra8j.com` 整域走代理，但主机名里含 `2x3`/`ni5`/`j5o` 的走直连」
+就靠这个顺序才能生效 —— 通配放在后缀之后的话，会先被父域的代理规则截胡。
 
 第 5 条是核心。举两个例子：
 
@@ -260,6 +265,24 @@ public/
 - `overrides` — 你的规则实际盖掉了什么
 - `extraSources.*.sameDomainList` / `carveOutList` — 第三方清单的冲突明细
 - `skippedSamples` — 上游新增了 PAC 表达不了的规则会列在这里
+
+### 正则规则怎么处理
+
+PAC 里**不执行**上游的正则，一律在构建期降级成 `shExpMatch` 的 glob：
+
+```
+/^https?:\/\/[^\/]+blogspot\.(.*)/                     -> *blogspot.*
+^https?:\/\/(?=.*?(2x3|ni5|j5o))[a-z0-9.-]+\.foo\.com$  -> *2x3*.foo.com
+                                                            *ni5*.foo.com
+                                                            *j5o*.foo.com
+```
+
+降不下来的（反向断言 `(?<=`、命名分组、复杂字符集）**直接进 skipped 报告，
+绝不硬塞**。原因是 Windows 的 JScript 不支持 ES6 正则语法，一旦把这种正则
+写进 PAC，加载阶段就是语法错误 —— **整个 PAC 全废**，比一条规则不生效严重得多。
+
+同理，关键词数组只放纯字面子串。`npm test` 里有一条断言专门扫 `DIRECT_K`/`PROXY_K`，
+发现正则元字符就报错。
 
 ---
 

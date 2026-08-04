@@ -127,6 +127,13 @@ const CASES = [
   ['bloomberg.cn', 'P'],
   ['openapi.longbridge.cn', 'P'],
 
+  // 上游那条正则白名单降级成 glob 后应该真的生效：
+  // ||xn--ngstr-lra8j.com 走代理，但含 2x3/ni5/j5o 的主机直连
+  ['abc.xn--ngstr-lra8j.com', 'P'],
+  ['2x3abc.xn--ngstr-lra8j.com', 'D'],
+  ['xxni5yy.xn--ngstr-lra8j.com', 'D'],
+  ['j5o.xn--ngstr-lra8j.com', 'D'],
+
   // 内网域名后缀
   ['printer.lan', 'D'],
   ['nas.home.arpa', 'D'],
@@ -158,6 +165,20 @@ async function main() {
   } else {
     console.log('[ok]   ES5 语法体检通过');
   }
+
+  // 1b) 关键词数组里不能出现正则元字符（说明有规则没解析干净）
+  const kwArrays = src.match(/var (?:DIRECT|PROXY)_K = \[([^\]]*)\]/g) || [];
+  let kwDirty = 0;
+  for (const arr of kwArrays) {
+    for (const m of arr.matchAll(/"((?:[^"\\]|\\.)*)"/g)) {
+      if (/[\^$()[\]{}|+?]/.test(m[1])) {
+        console.error(`[FAIL] 关键词里混进了正则残渣: ${m[1].slice(0, 60)}`);
+        kwDirty++;
+      }
+    }
+  }
+  if (kwDirty) failed += kwDirty;
+  else console.log('[ok]   关键词数组干净，无正则残渣');
 
   // 2) 沙箱执行
   const ctx = vm.createContext({
