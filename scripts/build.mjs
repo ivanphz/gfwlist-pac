@@ -65,6 +65,76 @@ export async function loadConfig() {
   return cfg;
 }
 
+const CHAIN_SCHEMES = /^(DIRECT|PROXY|HTTP|HTTPS|SOCKS|SOCKS4|SOCKS5)$/i;
+// WinINET / WinHTTP（也就是 Windows「使用设置脚本」那条路）只认这几种。
+// Chrome / Firefox 有自己的 PAC 引擎，额外支持 SOCKS / SOCKS4 / SOCKS5。
+const WININET_SCHEMES = /^(DIRECT|PROXY)$/i;
+
+/** 检查代理链，返回告警数组。只警告不中断 —— 有些写法是刻意为之。 */
+export function validateChain(list) {
+  const warns = [];
+  const endpoints = new Set();
+  let sawWinInetHop = false;
+
+  for (const hop of list) {
+    const m = hop.trim().match(/^(\S+)(?:\s+(\S+))?$/);
+    if (!m) {
+      warns.push(`代理链条目格式看不懂: "${hop}"`);
+      continue;
+    }
+    const [, scheme, addr] = m;
+    if (!CHAIN_SCHEMES.test(scheme)) {
+      warns.push(`"${hop}" 的类型 ${scheme} 不是合法的 PAC 关键字`);
+      continue;
+    }
+    if (/^DIRECT$/i.test(scheme)) {
+      sawWinInetHop = true;
+      continue;
+    }
+    if (!addr) {
+      warns.push(`"${hop}" 缺少 host:port`);
+      continue;
+    }
+
+    const pm = addr.match(/^(.+):(\d+)$/);
+    if (!pm) {
+      warns.push(`"${hop}" 的地址不是 host:port 形式`);
+      continue;
+    }
+    const port = Number(pm[2]);
+    if (port === 0) {
+      warns.push(
+        `"${hop}" 用了端口 0。0 不是合法 TCP 端口，不同引擎的处理不一致：` +
+          `有的整条跳过、有的会归一成默认端口。建议改成 127.0.0.1:1，` +
+          `环回口上会立刻收到 RST，失败更快也更确定。`
+      );
+    } else if (port > 65535) {
+      warns.push(`"${hop}" 的端口 ${port} 超出范围`);
+    }
+
+    endpoints.add(addr);
+    if (WININET_SCHEMES.test(scheme)) sawWinInetHop = true;
+  }
+
+  if (!sawWinInetHop) {
+    warns.push(
+      '整条链里没有 PROXY 或 DIRECT。Windows 的系统代理（WinINET/WinHTTP）不认 SOCKS 系列关键字，' +
+        '只有 Chrome / Firefox 自带的 PAC 引擎认。这样配的话，走系统代理的程序会全部连不上。'
+    );
+  }
+
+  // 末端的 block 地址不算冗余，排掉再判断
+  const real = [...endpoints].filter((a) => !/:(0|1)$/.test(a));
+  if (real.length === 1 && list.filter((h) => !/^DIRECT$/i.test(h)).length > 2) {
+    warns.push(
+      `链上多跳都指向同一个 ${real[0]}。如果它是混合端口（同时提供 SOCKS 和 HTTP），` +
+        `这样写是对的 —— 分别照顾浏览器和系统代理两条路径；` +
+        `但要注意进程一挂两跳一起失效，这不构成真正的冗余。`
+    );
+  }
+  return warns;
+}
+
 /**
  * 把 proxy / fallback 拼成 PAC 的返回值字符串。
  *   ["SOCKS5 127.0.0.1:1080", "PROXY 127.0.0.1:7890"] + fallback:"block"
@@ -645,6 +715,8 @@ async function main() {
   const offline = argv.includes('--offline');
   const cfg = await loadConfig();
   const chain = buildProxyChain(cfg);
+  const chainWarns = validateChain(chain.split(';').map((s) => s.trim()));
+  for (const w of chainWarns) console.warn(`[warn] 代理链: ${w}`);
   const defaultAction =
     (cfg.defaultAction || 'direct').toLowerCase() === 'proxy' ? 'P' : 'D';
 
@@ -764,6 +836,7 @@ async function main() {
     builtAt: new Date().toISOString(),
     upstream: cfg.upstream,
     proxyChain: chain,
+    proxyChainWarnings: chainWarns,
     fallback: cfg.fallback || 'block',
     defaultAction: defaultAction === 'D' ? 'direct' : 'proxy',
     counts: {
