@@ -50,15 +50,18 @@ jobs:
       - name: 自测
         run: node scripts/test.mjs
 
+      - name: 由模板生成 README
+        run: node scripts/gen-readme.mjs
+
       - name: 有变化才提交
         id: commit
         run: |
           set -euo pipefail
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A public
+          git add -A public README.md
           # stats.json 里的 builtAt 每次都变，只看 .pac 有没有实质变化
-          if git diff --cached --quiet -- '*.pac'; then
+          if git diff --cached --quiet -- '*.pac' README.md; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
             echo "规则无变化，跳过提交"
             git reset
