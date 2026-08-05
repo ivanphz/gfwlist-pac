@@ -1,13 +1,16 @@
 # Cloudflare Pages 响应头
-# PAC 必须用这个 MIME，否则部分 Windows/浏览器会拒绝解析
+
+# PAC 必须用这个 MIME，否则部分 Windows/浏览器会拒绝解析。
+# 缓存策略：no-cache 不是"不缓存"，是"每次都要回源验证"。
+# Windows 侧的 PAC 缓存极其顽固，服务端能做的就是别再火上浇油。
 /*.pac
   Content-Type: application/x-ns-proxy-autoconfig; charset=utf-8
-  Cache-Control: public, max-age=300, must-revalidate
+  Cache-Control: no-cache, must-revalidate, max-age=0
   X-Robots-Tag: noindex, nofollow
 
 /*/stats.json
   Content-Type: application/json; charset=utf-8
-  Cache-Control: public, max-age=300, must-revalidate
+  Cache-Control: no-cache, must-revalidate, max-age=0
   X-Robots-Tag: noindex, nofollow
 
 /*
