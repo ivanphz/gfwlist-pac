@@ -180,6 +180,18 @@ async function main() {
     console.log('[ok]   ES5 语法体检通过');
   }
 
+  // 1a) 正则字面量必须完好 —— 模板转义出错会把 \\d 吃成 d，静默失配
+  const RE_CHECKS = [
+    [/return \/\^\\d\{1,3\}\\\.\\d\{1,3\}/, 'isIPv4 的 \\d'],
+  ];
+  for (const [re, name] of RE_CHECKS) {
+    if (!re.test(src)) {
+      console.error(`[FAIL] ${name} 在生成物里丢了转义`);
+      failed++;
+    }
+  }
+  if (!failed) console.log('[ok]   正则字面量转义完好');
+
   // 1b) 关键词数组里不能出现正则元字符（说明有规则没解析干净）
   const kwArrays = src.match(/var (?:DIRECT|PROXY)_K = \[([^\]]*)\]/g) || [];
   let kwDirty = 0;
@@ -247,8 +259,14 @@ async function main() {
   }
   for (const d of cProxy.buckets.exact) cases.push([d, 'P']);
   for (const d of cDirect.buckets.exact) cases.push([d, 'D']);
-  for (const a of cProxy.buckets.v6) cases.push(['[' + a + ']', 'P']);
-  for (const a of cDirect.buckets.v6) cases.push(['[' + a + ']', 'D']);
+  // v6 桶存的是 32 位十六进制，还原成带冒号的写法再测
+  const v6str = (hex) => (hex.match(/.{4}/g) || []).join(':');
+  if ((cfg.ipv6 || 'direct').toLowerCase() === 'smart') {
+    for (const a of cProxy.buckets.v6) cases.push(['[' + v6str(a) + ']', 'P']);
+    for (const a of cDirect.buckets.v6) cases.push(['[' + v6str(a) + ']', 'D']);
+  } else if (cProxy.buckets.v6.size || cDirect.buckets.v6.size) {
+    console.log('[warn] ipv6=direct，rules 里的 IPv6 规则不会生效（IPv6 字面量一律直连）');
+  }
   console.log(
     `[ok]   自有规则 ${cProxy.buckets.domain.size} 代理 / ${cDirect.buckets.domain.size} 直连，已纳入用例`
   );
