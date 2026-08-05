@@ -1,0 +1,20 @@
+# ============================================================
+# GitHub 显示控制。对构建没有任何影响，纯粹是网页上好看点。
+# ============================================================
+
+# rules/*.txt 是「# 注释 + 每行一条模式，支持 * 通配」的格式，
+# 和 .gitignore 的语法结构基本一致，所以直接按它高亮。
+#
+# 不写这行的话，GitHub 对 .txt 只能靠贝叶斯统计分类器去猜，
+# 两个格式相同的文件可能猜出不同结果 —— 一个有色一个没色就是这么来的。
+rules/*.txt linguist-language=gitignore
+
+# 构建产物：不参与仓库语言统计，diff 里默认折叠。
+# 不标的话 80 KB 的 proxy.pac 会把语言条整个刷成 JavaScript。
+public/** linguist-generated=true
+
+# README.md 是生成的，改 docs/README.template.md 才对
+README.md linguist-generated=true
+
+# PAC 运行时是给旧 JScript 引擎跑的，别让它影响语言统计的准确性
+scripts/pac-runtime.js linguist-language=JavaScript
