@@ -814,7 +814,17 @@ async function main() {
     );
   }
 
-  const tplRaw = await fs.readFile(p('scripts', 'pac-runtime.js'), 'utf8');
+  let tplRaw;
+  try {
+    tplRaw = await fs.readFile(p('scripts', 'pac-runtime.js'), 'utf8');
+  } catch (e) {
+    if (e.code !== 'ENOENT') throw e;
+    throw new Error(
+      '找不到 scripts/pac-runtime.js —— 这是 PAC 的运行时模板，和 build.mjs 同级。\n' +
+        '        v4 之后 PAC 代码从 build.mjs 的模板字面量里抽了出来，' +
+        '这个文件必须一起上传，否则构建无法进行。'
+    );
+  }
   if ((cfg.ipv6 || 'direct').toLowerCase() !== 'smart'
       && (proxy.v6.size || direct.v6.size || proxy.v6net.size || direct.v6net.size)) {
     console.warn(
