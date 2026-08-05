@@ -23,5 +23,7 @@
       "url": "https://raw.githubusercontent.com/Loyalsoldier/v2ray-rules-dat/release/proxy-list.txt"
     }
   },
-  "ipv6": "direct"
+  "ipv6": "direct",
+  "repo": "ivanphz/gfwlist-pac",
+  "branch": "main"
 }

@@ -7,7 +7,10 @@
   "scripts": {
     "build": "node scripts/build.mjs",
     "test": "node scripts/test.mjs",
-    "all": "node scripts/build.mjs && node scripts/test.mjs"
+    "readme": "node scripts/gen-readme.mjs",
+    "all": "node scripts/build.mjs && node scripts/test.mjs && node scripts/gen-readme.mjs"
   },
-  "engines": { "node": ">=20" }
+  "engines": {
+    "node": ">=20"
+  }
 }
