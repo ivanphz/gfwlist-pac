@@ -1,5 +1,5 @@
 {
-  "builtAt": "2026-08-05T21:05:40.358Z",
+  "builtAt": "2026-08-07T00:52:23.968Z",
   "upstream": "https://raw.githubusercontent.com/gfwlist/gfwlist/master/gfwlist.txt",
   "proxyChain": "PROXY 127.0.0.1:1085; PROXY 127.0.0.1:1",
   "proxyChainWarnings": [],
@@ -7,7 +7,7 @@
   "defaultAction": "direct",
   "ipv6": "direct",
   "counts": {
-    "proxyDomains": 4262,
+    "proxyDomains": 4261,
     "directDomains": 66,
     "proxyExact": 0,
     "directExact": 0,
@@ -49,7 +49,7 @@
     "loyalsoldier-direct": {
       "mode": "report",
       "side": "direct",
-      "totalEntries": 111461,
+      "totalEntries": 111464,
       "sameDomainConflicts": 39,
       "subdomainCarveOuts": 59,
       "sameDomainList": [
@@ -164,5 +164,5 @@
     "gle  (bad-domain)",
     "google  (bad-domain)"
   ],
-  "bytes": 80902
+  "bytes": 80868
 }
