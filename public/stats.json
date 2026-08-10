@@ -1,5 +1,5 @@
 {
-  "builtAt": "2026-08-09T20:29:20.206Z",
+  "builtAt": "2026-08-10T20:40:12.930Z",
   "upstream": "https://raw.githubusercontent.com/gfwlist/gfwlist/master/gfwlist.txt",
   "proxyChain": "PROXY 127.0.0.1:1085; PROXY 127.0.0.1:1",
   "proxyChainWarnings": [],
@@ -7,7 +7,7 @@
   "defaultAction": "direct",
   "ipv6": "direct",
   "counts": {
-    "proxyDomains": 4265,
+    "proxyDomains": 4266,
     "directDomains": 66,
     "proxyExact": 0,
     "directExact": 0,
@@ -164,5 +164,5 @@
     "gle  (bad-domain)",
     "google  (bad-domain)"
   ],
-  "bytes": 80955
+  "bytes": 80970
 }
