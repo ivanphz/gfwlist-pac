@@ -14,7 +14,7 @@ rules/custom-*.txt ────┘              │
 
 > 本文件由 `docs/README.template.md` 自动生成，别直接改 README.md。
 > 当前数据：4278 条代理域名 / 66 条直连，
-> PAC 体积 79.3 KB，最后构建 2026-08-25。
+> PAC 体积 79.3 KB，最后构建 2026-08-26。
 
 ---
 
