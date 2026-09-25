@@ -14,7 +14,7 @@ rules/custom-*.txt ────┘              │
 
 > 本文件由 `docs/README.template.md` 自动生成，别直接改 README.md。
 > 当前数据：4296 条代理域名 / 65 条直连，
-> PAC 体积 79.6 KB，最后构建 2026-09-24。
+> PAC 体积 79.6 KB，最后构建 2026-09-25。
 
 ---
 
@@ -256,16 +256,16 @@ PAC 里已经硬编码，不用重复写。
 
 ### 关于 geosite:cn，先看这组数字
 
-拿 `direct-list.txt`（111,121 条，就是 geosite:cn）和当前 gfwlist 实测比对：
+拿 `direct-list.txt`（111,357 条，就是 geosite:cn）和当前 gfwlist 实测比对：
 
 | mode | 落地条目 | PAC 体积 |
 |---|---|---|
 | `report` | 0 | ~79 KB |
-| `intersect` | 40 + 59 | ~81 KB |
+| `intersect` | 39 + 59 | ~81 KB |
 | `full` | 11 万+ | **~1,925 KB** |
 
 **因为默认动作已经是直连，导入十几万条「中国域名直连」几乎全是冗余** —— 它们本来就直连。
-真正有价值的只有和 gfwlist 打架的：**40 条整域冲突 + 59 条子域挖孔**。
+真正有价值的只有和 gfwlist 打架的：**39 条整域冲突 + 59 条子域挖孔**。
 体积差 24 倍，效果一样。`geoip:cn` 同理 100% 冗余，还要每个 IP 请求线性扫 `isInNet`。
 
 默认给 `report` 是因为那几十条冲突大多是券商（futunn / tigerbrokers / moomoo /

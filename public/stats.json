@@ -1,5 +1,5 @@
 {
-  "builtAt": "2026-09-24T23:00:24.486Z",
+  "builtAt": "2026-09-25T23:04:56.673Z",
   "upstream": "https://raw.githubusercontent.com/gfwlist/gfwlist/master/gfwlist.txt",
   "proxyChain": "PROXY 127.0.0.1:1085; PROXY 127.0.0.1:1",
   "proxyChainWarnings": [],
@@ -49,8 +49,8 @@
     "loyalsoldier-direct": {
       "mode": "report",
       "side": "direct",
-      "totalEntries": 111121,
-      "sameDomainConflicts": 40,
+      "totalEntries": 111357,
+      "sameDomainConflicts": 39,
       "subdomainCarveOuts": 59,
       "sameDomainList": [
         "as.mr",
@@ -75,7 +75,6 @@
         "lbctrl.com",
         "lbkrs.com",
         "ldplayer.net",
-        "linux.sb",
         "liuxiaotong.com",
         "longbridgeapp.com",
         "longbridgehk.com",
