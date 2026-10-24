@@ -13,8 +13,8 @@ rules/custom-*.txt ────┘              │
 **默认策略是白名单代理**：只有命中规则的域名走代理，其余一律直连。
 
 > 本文件由 `docs/README.template.md` 自动生成，别直接改 README.md。
-> 当前数据：4344 条代理域名 / 65 条直连，
-> PAC 体积 80.4 KB，最后构建 2026-10-23。
+> 当前数据：4353 条代理域名 / 65 条直连，
+> PAC 体积 80.5 KB，最后构建 2026-10-24。
 
 ---
 
@@ -256,7 +256,7 @@ PAC 里已经硬编码，不用重复写。
 
 ### 关于 geosite:cn，先看这组数字
 
-拿 `direct-list.txt`（110,185 条，就是 geosite:cn）和当前 gfwlist 实测比对：
+拿 `direct-list.txt`（110,191 条，就是 geosite:cn）和当前 gfwlist 实测比对：
 
 | mode | 落地条目 | PAC 体积 |
 |---|---|---|
