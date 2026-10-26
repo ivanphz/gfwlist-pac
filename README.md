@@ -14,7 +14,7 @@ rules/custom-*.txt ────┘              │
 
 > 本文件由 `docs/README.template.md` 自动生成，别直接改 README.md。
 > 当前数据：4353 条代理域名 / 65 条直连，
-> PAC 体积 80.5 KB，最后构建 2026-10-25。
+> PAC 体积 80.5 KB，最后构建 2026-10-26。
 
 ---
 
@@ -256,7 +256,7 @@ PAC 里已经硬编码，不用重复写。
 
 ### 关于 geosite:cn，先看这组数字
 
-拿 `direct-list.txt`（110,191 条，就是 geosite:cn）和当前 gfwlist 实测比对：
+拿 `direct-list.txt`（110,193 条，就是 geosite:cn）和当前 gfwlist 实测比对：
 
 | mode | 落地条目 | PAC 体积 |
 |---|---|---|
