@@ -1,5 +1,5 @@
 {
-  "builtAt": "2026-10-31T23:05:19.596Z",
+  "builtAt": "2026-11-01T23:22:26.306Z",
   "upstream": "https://raw.githubusercontent.com/gfwlist/gfwlist/master/gfwlist.txt",
   "proxyChain": "PROXY 127.0.0.1:1085; PROXY 127.0.0.1:1",
   "proxyChainWarnings": [],
@@ -49,7 +49,7 @@
     "loyalsoldier-direct": {
       "mode": "report",
       "side": "direct",
-      "totalEntries": 110136,
+      "totalEntries": 110139,
       "sameDomainConflicts": 36,
       "subdomainCarveOuts": 59,
       "sameDomainList": [
